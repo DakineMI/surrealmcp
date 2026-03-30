@@ -23,7 +23,10 @@ pub async fn create_client_connection(
     if let (Some(username), Some(password)) = (username, password) {
         debug!("Attempting authentication with username: {}", username);
         instance
-            .signin(Root { username, password })
+            .signin(Root {
+                username: username.to_string(),
+                password: password.to_string(),
+            })
             .await
             .map_err(|e| anyhow!(e.to_string()))?;
         debug!("Authentication successful");

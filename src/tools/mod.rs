@@ -4,17 +4,19 @@ use metrics::counter;
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
     handler::server::router::tool::ToolRouter,
-    handler::server::tool::Parameters,
+    handler::server::wrapper::Parameters,
     model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
     service::RequestContext,
     tool, tool_handler, tool_router,
 };
 use serde::Deserialize;
+use surrealdb::types::SurrealValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
-use surrealdb::{Surreal, Value, engine::any::Any};
+use surrealdb::{Surreal, engine::any::Any};
+use surrealdb::types::Value;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, trace, warn};
 
@@ -28,22 +30,22 @@ use crate::utils::{convert_json_to_surreal, parse_target, parse_targets};
 // Global metrics
 static QUERY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Deserialize)]
+#[derive(Deserialize, SurrealValue)]
 struct ListNamespaces {
     namespaces: Vec<Namespace>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, SurrealValue)]
 struct Namespace {
     name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, SurrealValue)]
 struct ListDatabases {
     databases: Vec<Database>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, SurrealValue)]
 struct Database {
     name: String,
 }
@@ -1994,21 +1996,20 @@ impl ServerHandler for SurrealService {
         // Output debugging information
         debug!("Getting server info");
         // Get the server info
-        ServerInfo {
-            capabilities: ServerCapabilities::builder()
+        rmcp::model::InitializeResult::new(
+            ServerCapabilities::builder()
                 .enable_resources()
                 .enable_prompts()
                 .enable_tools()
                 .build(),
-            instructions: Some(include_str!("../../server.md").to_string()),
-            ..Default::default()
-        }
+        )
+        .with_instructions(include_str!("../../server.md"))
     }
 
     /// Initialize the MCP server
     async fn initialize(
         &self,
-        _req: rmcp::model::InitializeRequestParam,
+        _req: rmcp::model::InitializeRequestParams,
         ctx: RequestContext<RoleServer>,
     ) -> Result<rmcp::model::InitializeResult, McpError> {
         // Output debugging information
@@ -2037,7 +2038,7 @@ impl ServerHandler for SurrealService {
     /// List the MCP server prompts
     async fn list_prompts(
         &self,
-        _req: Option<rmcp::model::PaginatedRequestParam>,
+        _req: Option<rmcp::model::PaginatedRequestParams>,
         _ctx: RequestContext<RoleServer>,
     ) -> Result<rmcp::model::ListPromptsResult, McpError> {
         // Output debugging information
@@ -2048,23 +2049,22 @@ impl ServerHandler for SurrealService {
         Ok(rmcp::model::ListPromptsResult {
             prompts,
             next_cursor: None,
+            meta: None,
         })
     }
 
     /// Get an MCP server prompt
     async fn get_prompt(
         &self,
-        req: rmcp::model::GetPromptRequestParam,
+        req: rmcp::model::GetPromptRequestParams,
         _ctx: RequestContext<RoleServer>,
     ) -> Result<rmcp::model::GetPromptResult, McpError> {
         // Output debugging information
         debug!(prompt_name = %req.name, "Getting prompt");
         // Get prompt from the prompts module
         match prompts::get_prompt_with_arguments(&req.name, req.arguments) {
-            Some((description, messages)) => Ok(rmcp::model::GetPromptResult {
-                description: Some(description),
-                messages,
-            }),
+            Some((description, messages)) => Ok(rmcp::model::GetPromptResult::new(messages)
+                .with_description(description)),
             None => Err(McpError::internal_error(
                 format!("Unknown prompt: {}", req.name),
                 None,
@@ -2075,7 +2075,7 @@ impl ServerHandler for SurrealService {
     /// List the MCP server resources
     async fn list_resources(
         &self,
-        _req: Option<rmcp::model::PaginatedRequestParam>,
+        _req: Option<rmcp::model::PaginatedRequestParams>,
         _ctx: RequestContext<RoleServer>,
     ) -> Result<rmcp::model::ListResourcesResult, McpError> {
         // Output debugging information
@@ -2086,13 +2086,14 @@ impl ServerHandler for SurrealService {
         Ok(rmcp::model::ListResourcesResult {
             resources,
             next_cursor: None,
+            meta: None,
         })
     }
 
     /// Get an MCP server resource
     async fn read_resource(
         &self,
-        req: rmcp::model::ReadResourceRequestParam,
+        req: rmcp::model::ReadResourceRequestParams,
         _ctx: RequestContext<RoleServer>,
     ) -> Result<rmcp::model::ReadResourceResult, McpError> {
         // Output debugging information

@@ -20,20 +20,16 @@ pub trait ResourceProvider {
     /// Get the resource metadata
     fn meta(&self) -> Resource {
         let size = self.content().len() as u32;
-        let raw = RawResource {
-            size: Some(size),
-            uri: self.uri().to_string(),
-            name: self.name().to_string(),
-            mime_type: Some(self.mime_type().to_string()),
-            description: Some(self.description().to_string()),
-        };
+        let raw = RawResource::new(self.uri(), self.name())
+            .with_title(self.name())
+            .with_description(self.description())
+            .with_mime_type(self.mime_type())
+            .with_size(size);
         Annotated::new(raw, None)
     }
 
     fn read(&self) -> ReadResourceResult {
-        ReadResourceResult {
-            contents: vec![ResourceContents::text(self.content(), self.uri())],
-        }
+        ReadResourceResult::new(vec![ResourceContents::text(self.content(), self.uri())])
     }
 }
 
