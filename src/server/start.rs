@@ -381,7 +381,7 @@ async fn start_http_server(config: ServerConfig) -> Result<()> {
         },
         session_manager,
         StreamableHttpServerConfig::default()
-            .with_stateful_mode(true)
+            .with_stateful_mode(false)
             .with_sse_keep_alive(None),
     );
     // Create rate limiting layer with metrics
