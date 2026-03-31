@@ -1995,10 +1995,6 @@ impl ServerHandler for SurrealService {
     fn get_info(&self) -> ServerInfo {
         // Output debugging information
         debug!("Getting server info");
-        
-        let tools = self.tool_router.list_all();
-        debug!("Tools available: {} tools found", tools.len());
-        
         // Get the server info
         rmcp::model::InitializeResult::new(
             ServerCapabilities::builder()
